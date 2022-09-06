@@ -1,7 +1,8 @@
 // Package vnc implements a VNC client.
 //
 // References:
-//   [PROTOCOL]: http://tools.ietf.org/html/rfc6143
+//
+//	[PROTOCOL]: http://tools.ietf.org/html/rfc6143
 package vnc
 
 import (
@@ -27,13 +28,13 @@ type ClientConn struct {
 	Encs []Encoding
 
 	// Width of the frame buffer in pixels, sent from the server.
-	FrameBufferWidth uint16
+	frameBufferWidth uint16
 
 	// Height of the frame buffer in pixels, sent from the server.
-	FrameBufferHeight uint16
+	frameBufferHeight uint16
 
 	// Name associated with the desktop, sent from the server.
-	DesktopName string
+	desktopName string
 
 	// The pixel format associated with the connection. This shouldn't
 	// be modified. If you wish to set a new pixel format, use the
@@ -64,6 +65,9 @@ type ClientConfig struct {
 	// This only needs to contain NEW server messages, and doesn't
 	// need to explicitly contain the RFC-required messages.
 	ServerMessages []ServerMessage
+
+	// A function to call when the connection is closed.
+	OnClose func()
 }
 
 func Client(c net.Conn, cfg *ClientConfig) (*ClientConn, error) {
@@ -83,7 +87,11 @@ func Client(c net.Conn, cfg *ClientConfig) (*ClientConn, error) {
 }
 
 func (c *ClientConn) Close() error {
-	return c.c.Close()
+	err := c.c.Close()
+	if c.config.OnClose != nil {
+		c.config.OnClose()
+	}
+	return err
 }
 
 // CutText tells the server that the client has new text in its cut buffer.
@@ -128,6 +136,10 @@ func (c *ClientConn) CutText(text string) error {
 	return nil
 }
 
+func (c *ClientConn) DesktopName() string {
+	return c.desktopName
+}
+
 // Requests a framebuffer update from the server. There may be an indefinite
 // time between the request and the actual framebuffer update being
 // received.
@@ -158,6 +170,14 @@ func (c *ClientConn) FramebufferUpdateRequest(incremental bool, x, y, width, hei
 	}
 
 	return nil
+}
+
+func (c *ClientConn) FrameHeight() uint16 {
+	return c.frameBufferHeight
+}
+
+func (c *ClientConn) FrameWidth() uint16 {
+	return c.frameBufferWidth
 }
 
 // KeyEvent indiciates a key press or release and sends it to the server.
@@ -196,12 +216,12 @@ func (c *ClientConn) KeyEvent(keysym uint32, down bool) error {
 // is set, it is pressed, when it is unset, it is released.
 //
 // See RFC 6143 Section 7.5.5
-func (c *ClientConn) PointerEvent(mask ButtonMask, x, y uint16) error {
+func (c *ClientConn) PointerEvent(mask uint8, x, y uint16) error {
 	var buf bytes.Buffer
 
 	data := []interface{}{
 		uint8(5),
-		uint8(mask),
+		mask,
 		x,
 		y,
 	}
@@ -389,11 +409,11 @@ FindAuth:
 	}
 
 	// 7.3.2 ServerInit
-	if err = binary.Read(c.c, binary.BigEndian, &c.FrameBufferWidth); err != nil {
+	if err = binary.Read(c.c, binary.BigEndian, &c.frameBufferWidth); err != nil {
 		return err
 	}
 
-	if err = binary.Read(c.c, binary.BigEndian, &c.FrameBufferHeight); err != nil {
+	if err = binary.Read(c.c, binary.BigEndian, &c.frameBufferHeight); err != nil {
 		return err
 	}
 
@@ -412,7 +432,7 @@ FindAuth:
 		return err
 	}
 
-	c.DesktopName = string(nameBytes)
+	c.desktopName = string(nameBytes)
 
 	return nil
 }
