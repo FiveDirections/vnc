@@ -10,6 +10,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"unicode"
 )
@@ -84,6 +85,22 @@ func Client(c net.Conn, cfg *ClientConfig) (*ClientConn, error) {
 	go conn.mainLoop()
 
 	return conn, nil
+}
+
+// Reconnect makes an attempt to establish a new connection to the VNC server.
+// ClientConn's connection and details are updated to reflect the new connection.
+func (c *ClientConn) Reconnect() error {
+	var err error
+
+	c.c.Close() // ensure that the old connection is closed, but don't error if it is.
+	c.c, err = net.Dial(c.c.RemoteAddr().Network(), c.c.RemoteAddr().String())
+	if err != nil {
+		return err
+	}
+
+	c, err = Client(c.c, c.config)
+
+	return err
 }
 
 func (c *ClientConn) Close() error {
@@ -471,6 +488,7 @@ func (c *ClientConn) mainLoop() {
 		msg, ok := typeMap[messageType]
 		if !ok {
 			// Unsupported message type! Bad!
+			log.Printf("vnc: mainLoop: unsupported messageType(%d)\n", messageType)
 			break
 		}
 
