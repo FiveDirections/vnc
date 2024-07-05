@@ -157,12 +157,17 @@ func (c *ClientConn) DesktopName() string {
 	return c.desktopName
 }
 
+func (c *ClientConn) String() string {
+	return fmt.Sprintf("vnc://%s", c.c.RemoteAddr().String())
+}
+
 // Requests a framebuffer update from the server. There may be an indefinite
 // time between the request and the actual framebuffer update being
 // received.
 //
 // See RFC 6143 Section 7.5.3
 func (c *ClientConn) FramebufferUpdateRequest(incremental bool, x, y, width, height uint16) error {
+	// log.Println("FramebufferUpdateRequest incremental(%v)", incremental)
 	var buf bytes.Buffer
 	var incrementalByte uint8 = 0
 
@@ -482,18 +487,19 @@ func (c *ClientConn) mainLoop() {
 	for {
 		var messageType uint8
 		if err := binary.Read(c.c, binary.BigEndian, &messageType); err != nil {
-			break
+			break // this is generally going to be a closed connection or network failure.
 		}
 
 		msg, ok := typeMap[messageType]
 		if !ok {
 			// Unsupported message type! Bad!
-			log.Printf("vnc: mainLoop: unsupported messageType(%d)\n", messageType)
+			log.Printf("[%s](%s) vnc: mainLoop: unsupported messageType(%d)\n", c.DesktopName(), c.String(), messageType)
 			break
 		}
 
 		parsedMsg, err := msg.Read(c, c.c)
 		if err != nil {
+			log.Printf("[%s](%s) vnc: mainLoop: error reading message: %v", c.DesktopName(), c.String(), err)
 			break
 		}
 
