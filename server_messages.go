@@ -50,13 +50,15 @@ func (*FramebufferUpdateMessage) Read(c *ClientConn, r io.Reader) (ServerMessage
 
 	// Build the map of encodings supported
 	encMap := make(map[int32]Encoding)
+
+	// We must always support the raw encoding,
+	// but also support an override implementation
+	rawEnc := new(RawEncoding)
+	encMap[rawEnc.Type()] = rawEnc
+
 	for _, enc := range c.Encs {
 		encMap[enc.Type()] = enc
 	}
-
-	// We must always support the raw encoding
-	rawEnc := new(RawEncoding)
-	encMap[rawEnc.Type()] = rawEnc
 
 	rects := make([]Rectangle, numRects)
 	for i := uint16(0); i < numRects; i++ {
