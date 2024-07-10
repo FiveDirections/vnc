@@ -158,7 +158,7 @@ func (c *ClientConn) DesktopName() string {
 }
 
 func (c *ClientConn) String() string {
-	return fmt.Sprintf("vnc://%s", c.c.RemoteAddr().String())
+	return c.c.RemoteAddr().String()
 }
 
 // Requests a framebuffer update from the server. There may be an indefinite
